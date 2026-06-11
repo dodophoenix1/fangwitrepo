@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ระบบเช็คชื่อนักเรียนออนไลน์แบบ Real-time | FANGWIT School</title>
+    
+    <!-- Early inline error handler & console log interceptor to capture script errors before app.js registers -->
+    <script>
+        (function() {
+            const logs = [];
+            const originalLog = console.log;
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            
+            function addLog(type, msg) {
+                logs.push({ type, msg, time: new Date().toLocaleTimeString() });
+                updateLogUI();
+            }
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args);
+                addLog('log', args.join(' '));
+            };
+            console.error = function(...args) {
+                originalError.apply(console, args);
+                addLog('error', args.join(' '));
+            };
+            console.warn = function(...args) {
+                originalWarn.apply(console, args);
+                addLog('warn', args.join(' '));
+            };
+            
+            window.onerror = function(message, source, lineno, colno, error) {
+                const errMsg = `❌ JS Error: ${message} at ${source}:${lineno}:${colno}`;
+                addLog('error', errMsg + (error && error.stack ? '\n' + error.stack : ''));
+                
+                // Show large error banner
+                const errBanner = document.getElementById('error-overlay-banner');
+                if (!errBanner) {
+                    const div = document.createElement('div');
+                    div.id = 'error-overlay-banner';
+                    div.style.position = 'fixed';
+                    div.style.top = '0';
+                    div.style.left = '0';
+                    div.style.width = '100%';
+                    div.style.backgroundColor = '#dc2626';
+                    div.style.color = '#ffffff';
+                    div.style.padding = '16px';
+                    div.style.fontSize = '13px';
+                    div.style.fontFamily = 'monospace';
+                    div.style.zIndex = '999999';
+                    div.style.whiteSpace = 'pre-wrap';
+                    div.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3)';
+                    div.style.borderBottom = '4px solid #991b1b';
+                    div.innerText = errMsg + (error && error.stack ? '\n' + error.stack : '');
+                    
+                    if (document.body) {
+                        document.body.appendChild(div);
+                    } else {
+                        document.addEventListener('DOMContentLoaded', () => {
+                            document.body.appendChild(div);
+                        });
+                    }
+                }
+                return false;
+            };
+            
+            function updateLogUI() {
+                let debugDiv = document.getElementById('debug-console-log');
+                if (!debugDiv) {
+                    debugDiv = document.createElement('div');
+                    debugDiv.id = 'debug-console-log';
+                    debugDiv.style.position = 'fixed';
+                    debugDiv.style.bottom = '0';
+                    debugDiv.style.left = '0';
+                    debugDiv.style.width = '100%';
+                    debugDiv.style.maxHeight = '180px';
+                    debugDiv.style.overflowY = 'auto';
+                    debugDiv.style.backgroundColor = '#0f172a';
+                    debugDiv.style.color = '#cbd5e1';
+                    debugDiv.style.fontFamily = 'monospace';
+                    debugDiv.style.fontSize = '11px';
+                    debugDiv.style.padding = '10px';
+                    debugDiv.style.zIndex = '99999';
+                    debugDiv.style.borderTop = '3px solid #3b82f6';
+                    debugDiv.style.boxShadow = '0 -10px 15px -3px rgba(0,0,0,0.1)';
+                    debugDiv.style.display = 'none'; // Default closed
+                    
+                    // Create toggle button
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.innerHTML = '🐞 Debug';
+                    toggleBtn.style.position = 'fixed';
+                    toggleBtn.style.bottom = '12px';
+                    toggleBtn.style.right = '12px';
+                    toggleBtn.style.zIndex = '100000';
+                    toggleBtn.style.backgroundColor = '#0f172a';
+                    toggleBtn.style.color = '#38bdf8';
+                    toggleBtn.style.border = '1px solid #3b82f6';
+                    toggleBtn.style.borderRadius = '9999px';
+                    toggleBtn.style.padding = '6px 12px';
+                    toggleBtn.style.fontSize = '11px';
+                    toggleBtn.style.fontFamily = 'monospace';
+                    toggleBtn.style.fontWeight = 'bold';
+                    toggleBtn.style.cursor = 'pointer';
+                    toggleBtn.style.boxShadow = '0 4px 10px rgba(0, 0, 0, 0.3)';
+                    
+                    toggleBtn.addEventListener('click', () => {
+                        if (debugDiv.style.display === 'none') {
+                            debugDiv.style.display = 'block';
+                            toggleBtn.style.bottom = '190px';
+                            toggleBtn.style.backgroundColor = '#dc2626';
+                            toggleBtn.style.color = '#ffffff';
+                            toggleBtn.style.borderColor = '#991b1b';
+                        } else {
+                            debugDiv.style.display = 'none';
+                            toggleBtn.style.bottom = '12px';
+                            toggleBtn.style.backgroundColor = '#0f172a';
+                            toggleBtn.style.color = '#38bdf8';
+                            toggleBtn.style.borderColor = '#3b82f6';
+                        }
+                    });
+                    
+                    if (document.body) {
+                        document.body.appendChild(debugDiv);
+                        document.body.appendChild(toggleBtn);
+                    } else {
+                        document.addEventListener('DOMContentLoaded', () => {
+                            document.body.appendChild(debugDiv);
+                            document.body.appendChild(toggleBtn);
+                        });
+                    }
+                }
+                
+                debugDiv.innerHTML = `<div style="font-weight: bold; border-bottom: 2px solid #475569; padding-bottom: 4px; margin-bottom: 4px; color: #f8fafc;">Diagnostic Logs:</div>` +
+                    logs.map(l => {
+                        let color = '#38bdf8';
+                        if (l.type === 'error') color = '#f87171';
+                        if (l.type === 'warn') color = '#fbbf24';
+                        return `<div style="color: ${color}; border-bottom: 1px solid #334155; padding: 2px 0; white-space: pre-wrap;">[${l.time}] ${l.msg}</div>`;
+                    }).join('') + `<div id="debug-dom-status" style="color: #4ade80; padding-top: 6px; font-weight: bold; border-top: 1px dashed #475569; margin-top: 6px;"></div>`;
+                
+                const statusDiv = document.getElementById('debug-dom-status');
+                if (statusDiv) {
+                    const checkin = document.getElementById('screen-check-in');
+                    const dashboard = document.getElementById('screen-dashboard');
+                    const admin = document.getElementById('screen-admin');
+                    const wrapper = document.querySelector('main');
+                    statusDiv.innerText = `DOM Status:\n` +
+                        `- main display wrapper: tag=main classes="${wrapper ? wrapper.className : 'null'}"\n` +
+                        `- screen-check-in: class="${checkin ? checkin.className : 'null'}" h=${checkin ? checkin.offsetHeight : 'null'}\n` +
+                        `- screen-dashboard: class="${dashboard ? dashboard.className : 'null'}"\n` +
+                        `- screen-admin: class="${admin ? admin.className : 'null'}"\n` +
+                        `- window.app initialized: ${window.app ? 'YES (activeTab=' + window.app.activeTab + ')' : 'NO'}`;
+                }
+                debugDiv.scrollTop = debugDiv.scrollHeight;
+            }
+            
+            document.addEventListener('DOMContentLoaded', () => {
+                addLog('info', 'DOMContentLoaded event fired.');
+                setTimeout(updateLogUI, 500);
+            });
+        })();
+    </script>
+    
+    <!-- Meta tags for SEO & Subdomain deployment -->
+    <meta name="description" content="ระบบเช็คชื่อนักเรียนและติดตามสถานะนักเรียนรายคาบแบบ Real-time สำหรับโรงเรียนและสถาบันการศึกษา">
+    <meta name="author" content="Fangwit School Developer Team">
+    <meta name="theme-color" content="#1e3a8a">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        academy: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                            950: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome & Custom CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- SheetJS for Excel/CSV Importing & Exporting -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Chart.js for Advanced Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen pb-20 md:pb-10">
+
+
+
+    <!-- TOP HEADER -->
+    <header class="bg-slate-900 text-white shadow-xl relative overflow-hidden">
+        <!-- Background light effect -->
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(37,99,235,0.2),transparent_60%)]"></div>
+        
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:py-5 relative z-10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <!-- School Logo & Title -->
+            <div class="flex items-center gap-3.5 text-center md:text-left">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-graduation-cap text-2xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-blue-200 bg-clip-text text-transparent">
+                        ระบบเช็คชื่อนักเรียนออนไลน์
+                    </h1>
+                    <p class="text-xs text-blue-300 font-medium tracking-wider uppercase">
+                        FANGWIT SCHOOL ATTENDANCE SYSTEM
+                    </p>
+                </div>
+            </div>
+
+            <!-- Global Time & Date Picker / Connection Status -->
+            <div class="flex flex-wrap items-center justify-center md:justify-end gap-3 w-full md:w-auto">
+                <!-- Status Badge -->
+                <div class="bg-slate-800/80 backdrop-blur-md border border-slate-700/50 rounded-full px-3.5 py-1.5 flex items-center gap-2 text-xs font-semibold">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-slate-300">REAL-TIME SYNC</span>
+                </div>
+                
+                <!-- Date input -->
+                <div class="relative">
+                    <input type="date" id="global-date" 
+                        class="bg-slate-800 border border-slate-700 rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:border-blue-500 text-white font-medium">
+                </div>
+
+                <!-- Period select -->
+                <div class="relative">
+                    <select id="global-period" 
+                        class="bg-slate-800 border border-slate-700 rounded-lg text-sm px-3 py-1.5 focus:outline-none focus:border-blue-500 text-white font-medium">
+                        <!-- Loaded by JS -->
+                    </select>
+                </div>
+
+                <!-- Logout Button -->
+                <button id="btn-logout" class="bg-red-600 hover:bg-red-700 text-white border border-red-500 rounded-lg text-sm px-3.5 py-1.5 focus:outline-none transition-all flex items-center gap-1.5 font-bold btn-tap-effect hidden">
+                    <i class="fas fa-sign-out-alt text-xs"></i>
+                    <span>ออกจากระบบ</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- NAVIGATION TABS BAR -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-around md:justify-start gap-2 md:gap-8">
+                <button data-tab="check-in" class="nav-tab tab-active py-4 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all">
+                    <i class="fas fa-edit text-base"></i>
+                    <span>เช็คชื่อ</span>
+                </button>
+                <button data-tab="dashboard" class="nav-tab py-4 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 text-slate-500 border-transparent hover:text-slate-800 transition-all">
+                    <i class="fas fa-chart-pie text-base"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button data-tab="admin" class="nav-tab py-4 px-3 text-sm font-semibold flex items-center gap-2 border-b-2 text-slate-500 border-transparent hover:text-slate-800 transition-all">
+                    <i class="fas fa-cog text-base"></i>
+                    <span>Admin & Export</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN APP WRAPPER -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        
+        <!-- ==================================================== -->
+        <!-- SCREEN 1: TAB CHECK-IN (เช็คชื่อ) -->
+        <!-- ==================================================== -->
+        <section id="screen-check-in" class="tab-screen">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                
+                <!-- Selector Left Column -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">เลือกห้องเรียน</h2>
+                        
+                        <!-- Grade Dropdown -->
+                        <div>
+                            <label for="checkin-grade" class="block text-xs font-semibold text-slate-500 mb-1.5">ระดับชั้น</label>
+                            <select id="checkin-grade" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-semibold text-slate-800">
+                                <option value="M1">มัธยมศึกษาปีที่ 1</option>
+                                <option value="M2">มัธยมศึกษาปีที่ 2</option>
+                                <option value="M3">มัธยมศึกษาปีที่ 3</option>
+                                <option value="M4">มัธยมศึกษาปีที่ 4</option>
+                                <option value="M5">มัธยมศึกษาปีที่ 5</option>
+                                <option value="M6">มัธยมศึกษาปีที่ 6</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Room Dropdown -->
+                        <div>
+                            <label for="checkin-room" class="block text-xs font-semibold text-slate-500 mb-1.5">ห้องเรียน</label>
+                            <select id="checkin-room" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-semibold text-slate-800">
+                                <!-- Loaded dynamically by JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Import Actions Card -->
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">นำเข้าข้อมูลนักเรียน</h2>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            ต้องการเปลี่ยนรายชื่อนักเรียนห้องนี้? คุณสามารถอัปโหลดไฟล์ Excel หรือ CSV เพื่ออัปเดตระบบได้ทันที
+                        </p>
+                        
+                        <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" class="hidden" />
+                        
+                        <button id="btn-trigger-import" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2.5 px-4 text-xs rounded-xl transition-all border border-blue-200 flex items-center justify-center gap-2 btn-tap-effect">
+                            <i class="fas fa-file-excel text-sm"></i>
+                            <span>นำเข้าไฟล์ Excel/CSV</span>
+                        </button>
+                        
+                        <button id="btn-trigger-add-student" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold py-2.5 px-4 text-xs rounded-xl transition-all border border-indigo-200 flex items-center justify-center gap-2 btn-tap-effect">
+                            <i class="fas fa-user-plus text-sm"></i>
+                            <span>เพิ่มรายชื่อนักเรียนรายคน</span>
+                        </button>
+                        
+                        <button id="btn-download-template" class="w-full text-slate-500 hover:text-slate-800 font-medium py-1 px-4 text-xs rounded-xl transition-all flex items-center justify-center gap-2">
+                            <i class="fas fa-download"></i>
+                            <span>ดาวน์โหลดไฟล์ต้นแบบ (.csv)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Students List Right Column -->
+                <div class="lg:col-span-3 space-y-4">
+                    <!-- Title Bar -->
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div>
+                            <h2 id="checkin-title-room" class="text-lg font-bold text-slate-800 flex items-center">
+                                <!-- Loaded by JS -->
+                            </h2>
+                            <p class="text-xs text-slate-400 mt-0.5">กดเลือกสถานะได้ทันที (1-Tap เปลี่ยนสถานะ)</p>
+                        </div>
+                        <div id="checkin-header-status">
+                            <!-- Status Badge loaded by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Select All Status Actions -->
+                    <div class="bg-white px-4 py-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                        <span class="font-bold text-slate-500"><i class="fas fa-check-double mr-1 text-blue-600"></i> เลือกสถานะทั้งห้อง:</span>
+                        <div class="flex flex-wrap gap-2 justify-end">
+                            <button onclick="window.app.markAllAs('มา')" class="px-3 py-1.5 font-bold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 transition-all btn-tap-effect">มาทั้งหมด</button>
+                            <button onclick="window.app.markAllAs('ขาด')" class="px-3 py-1.5 font-bold rounded-lg bg-red-50 text-red-700 hover:bg-red-600 hover:text-white border border-red-200 transition-all btn-tap-effect">ขาดทั้งหมด</button>
+                            <button onclick="window.app.markAllAs('ลา')" class="px-3 py-1.5 font-bold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 transition-all btn-tap-effect">ลาทั้งหมด</button>
+                            <button onclick="window.app.markAllAs('สาย')" class="px-3 py-1.5 font-bold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white border border-amber-200 transition-all btn-tap-effect">สายทั้งหมด</button>
+                            <button onclick="window.app.markAllAs('โดดเรียน')" class="px-3 py-1.5 font-bold rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white border border-purple-200 transition-all btn-tap-effect">โดดทั้งหมด</button>
+                        </div>
+                    </div>
+
+                    <!-- Student list content -->
+                    <div id="student-checkin-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3.5 max-h-[580px] overflow-y-auto pr-1">
+                        <!-- Loaded dynamically by JS -->
+                    </div>
+
+                    <!-- Save & Submit Button -->
+                    <div class="pt-3 flex justify-end">
+                        <button id="btn-save-attendance" class="bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white font-bold py-3.5 px-8 rounded-xl shadow-lg shadow-blue-500/10 transition-all flex items-center justify-center gap-2.5 text-sm md:text-base w-full sm:w-auto btn-tap-effect">
+                            <i class="fas fa-cloud-upload-alt text-base"></i>
+                            <span>บันทึกและส่งข้อมูลแบบ Real-time</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SCREEN 2: TAB DASHBOARD (แดชบอร์ด) -->
+        <!-- ==================================================== -->
+        <section id="screen-dashboard" class="tab-screen hidden space-y-6">
+            <!-- Time Info Bar -->
+            <div class="bg-slate-900/95 text-white p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3 shadow-md relative overflow-hidden">
+                <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(59,130,246,0.1),transparent)]"></div>
+                <div class="flex items-center gap-2.5 relative z-10 text-center sm:text-left">
+                    <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-bold">สถานะภาพรวมของสถาบัน</h2>
+                        <p id="status-time-info" class="text-xs text-blue-300">วันที่: - | คาบเรียน: -</p>
+                    </div>
+                </div>
+                <span class="px-3 py-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold rounded-full relative z-10 flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>ระบบกำลังรับส่งข้อมูลสด Real-time</span>
+                </span>
+            </div>
+
+            <!-- Analytics Filters Bar -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex flex-wrap items-center gap-3.5 w-full md:w-auto">
+                    <div>
+                        <label for="dashboard-filter-timeframe" class="block text-xs font-semibold text-slate-500 mb-1">ช่วงเวลาวิเคราะห์</label>
+                        <select id="dashboard-filter-timeframe" class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500 min-w-[150px]">
+                            <option value="daily" selected>รายวัน (คาบเรียนปัจจุบัน)</option>
+                            <option value="weekly">รายสัปดาห์ (7 วันย้อนหลัง)</option>
+                            <option value="monthly">รายเดือน (30 วันย้อนหลัง)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="dashboard-filter-scope" class="block text-xs font-semibold text-slate-500 mb-1">ขอบเขตข้อมูล</label>
+                        <select id="dashboard-filter-scope" class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500 min-w-[180px]">
+                            <option value="ALL" selected>ภาพรวมทั้งโรงเรียน</option>
+                            <option value="room">เฉพาะรายห้องเรียน</option>
+                        </select>
+                    </div>
+                    <div id="dashboard-room-select-wrapper" class="hidden">
+                        <label for="dashboard-filter-room" class="block text-xs font-semibold text-slate-500 mb-1">เลือกห้องเรียน</label>
+                        <select id="dashboard-filter-room" class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500 min-w-[120px]">
+                            <!-- Filled dynamically by JS -->
+                        </select>
+                    </div>
+                </div>
+                <div class="text-xs text-slate-400 font-bold bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200" id="analytics-active-range-display">
+                    แสดงข้อมูล: คาบเรียนปัจจุบัน
+                </div>
+            </div>
+
+            <!-- Total Overview Counter Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Total Students -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">นักเรียนทั้งหมด</span>
+                        <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs"><i class="fas fa-users"></i></div>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="text-3xl font-extrabold text-slate-800" id="stat-total-students">0</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">คนในทุกห้องเรียน</div>
+                    </div>
+                </div>
+
+                <!-- Present [มา] -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">มาเรียน</span>
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs"><i class="fas fa-user-check"></i></div>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="text-3xl font-extrabold text-emerald-600" id="stat-present">0</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">คนในช่วงเวลาที่เลือก</div>
+                    </div>
+                </div>
+
+                <!-- Absent [ขาด] -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">ขาดเรียน</span>
+                        <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xs"><i class="fas fa-user-times"></i></div>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="text-3xl font-extrabold text-red-600" id="stat-absent">0</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">คนในช่วงเวลาที่เลือก</div>
+                    </div>
+                </div>
+
+                <!-- Leave [ลา] -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">ลาเรียน</span>
+                        <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-xs"><i class="fas fa-envelope-open-text"></i></div>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="text-3xl font-extrabold text-blue-600" id="stat-leave">0</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">คนในช่วงเวลาที่เลือก</div>
+                    </div>
+                </div>
+
+                <!-- Late [สาย] -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">สาย</span>
+                        <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center text-xs"><i class="fas fa-user-clock"></i></div>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="text-3xl font-extrabold text-amber-600" id="stat-late">0</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">คนในช่วงเวลาที่เลือก</div>
+                    </div>
+                </div>
+
+                <!-- Skip Class [โดดเรียน] -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">โดดเรียน</span>
+                        <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center text-xs"><i class="fas fa-running"></i></div>
+                    </div>
+                    <div class="mt-2.5">
+                        <div class="text-3xl font-extrabold text-purple-600" id="stat-skip">0</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">คนในช่วงเวลาที่เลือก</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart.js Visualization Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Donut Chart (Proportion) -->
+                <div class="lg:col-span-1 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-[360px]">
+                    <div class="border-b border-slate-100 pb-2.5 mb-2.5 flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase"><i class="fas fa-chart-pie text-blue-600 mr-1.5"></i>สัดส่วนพฤติกรรมการเข้าเรียน (Donut)</h3>
+                    </div>
+                    <div class="relative flex-grow flex items-center justify-center h-[230px]">
+                        <canvas id="chart-donut"></canvas>
+                    </div>
+                </div>
+
+                <!-- Line Chart (Trend) -->
+                <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between h-[360px]">
+                    <div class="border-b border-slate-100 pb-2.5 mb-2.5 flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-slate-800 uppercase"><i class="fas fa-chart-line text-blue-600 mr-1.5"></i>แนวโน้มพฤติกรรมทางวินัยตามเวลา (Line)</h3>
+                        <span class="text-[10px] text-slate-400" id="line-chart-legend-label">ขาด | สาย | โดด</span>
+                    </div>
+                    <div class="relative flex-grow h-[230px] w-full">
+                        <canvas id="chart-line"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grouped Bar Chart (Class Comparison) -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-slate-800 uppercase"><i class="fas fa-chart-bar text-blue-600 mr-1.5"></i>เปรียบเทียบพฤติกรรมทางวินัยแยกตามห้องเรียน (Bar)</h3>
+                    <span class="text-[10px] text-slate-400">เปรียบเทียบ ขาด, สาย, โดดเรียน ในช่วงเวลาที่เลือก</span>
+                </div>
+                <div class="relative h-[280px] w-full">
+                    <canvas id="chart-bar"></canvas>
+                </div>
+            </div>
+
+            <!-- Split Section Grid: Class grid (left) vs Skipping students list (right) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Real-time Status Grid (24 Rooms) -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
+                            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fas fa-th-large text-blue-600"></i>
+                                <span>Real-time Status Grid (24 ห้องเรียน)</span>
+                            </h2>
+                            <span class="text-xs text-slate-400">เช็คห้องที่โดด/ขาดเรียนได้ทันที</span>
+                        </div>
+                        
+                        <!-- Grid layout 24 rooms -->
+                        <div id="dashboard-status-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hot Section: Skipping Students (รายชื่อนักเรียนโดดเรียนรายคาบ) -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fas fa-bolt text-red-500 animate-pulse"></i>
+                                <span class="text-red-600 font-extrabold">⚡ Hot Section: โดดเรียนคาบนี้</span>
+                            </h2>
+                            <span class="text-xs text-red-500 font-semibold bg-red-50 px-2 py-0.5 rounded-full" id="skips-counter-badge">Real-time</span>
+                        </div>
+                        
+                        <p class="text-xs text-slate-500 mb-4 leading-relaxed">
+                            รายชื่อนักเรียนที่ถูกเช็คว่า "โดดเรียน" ในทุกห้องเรียนคาบนี้ เพื่อความรวดเร็วสำหรับฝ่ายปกครองในการติดตามตัว
+                        </p>
+
+                        <!-- Live list skipping students -->
+                        <div id="dashboard-hot-skips" class="max-h-[460px] overflow-y-auto pr-1">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SCREEN 3: TAB ADMIN & EXPORT (แอดมินและการส่งออก) -->
+        <!-- ==================================================== -->
+        <section id="screen-admin" class="tab-screen hidden space-y-6">
+            <!-- ADMIN LOGIN CARD -->
+            <div id="admin-login-card" class="max-w-md mx-auto my-12 bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6 text-white">
+                <!-- Logo & Title -->
+                <div class="text-center space-y-2">
+                    <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <i class="fas fa-lock text-3xl text-white"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold font-display tracking-tight bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">ล็อกอินเพื่อเข้าสู่ส่วนแอดมิน</h2>
+                    <p class="text-xs text-slate-400">การเข้าถึงข้อมูลระบบการเช็คชื่อและส่งออกรายงาน Excel</p>
+                </div>
+                
+                <!-- Login Form -->
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label for="login-username" class="block text-xs font-semibold text-slate-400 mb-1.5 font-display">ชื่อผู้ใช้งาน (Username)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fas fa-user text-sm"></i></span>
+                            <input type="text" id="login-username" required placeholder="admin" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white font-semibold" />
+                        </div>
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-xs font-semibold text-slate-400 mb-1.5 font-display">รหัสผ่าน (Password)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500"><i class="fas fa-lock text-sm"></i></span>
+                            <input type="password" id="login-password" required placeholder="••••" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white font-semibold" />
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="login-remember" checked class="rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500">
+                            <span>จดจำการเข้าระบบ</span>
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm btn-tap-effect">
+                        <i class="fas fa-sign-in-alt"></i>
+                        <span>เข้าสู่ระบบ</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- ADMIN MAIN CONTENT (HIDDEN BY DEFAULT) -->
+            <div id="admin-content" class="space-y-6 hidden">
+                <!-- Filter & Action Card -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row justify-between items-stretch xl:items-center gap-4">
+                <div class="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                    <!-- Filter Room -->
+                    <div>
+                        <label for="admin-filter-room" class="block text-xs font-semibold text-slate-500 mb-1">แสดงผลเฉพาะห้อง</label>
+                        <select id="admin-filter-room" class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500 min-w-[150px]">
+                            <!-- Loaded by JS -->
+                        </select>
+                    </div>
+                    <!-- Date Range Picker -->
+                    <div>
+                        <label for="admin-export-start" class="block text-xs font-semibold text-slate-500 mb-1">วันที่เริ่มต้น</label>
+                        <input type="date" id="admin-export-start" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="admin-export-end" class="block text-xs font-semibold text-slate-500 mb-1">วันที่สิ้นสุด</label>
+                        <input type="date" id="admin-export-end" class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <!-- Export & Control Buttons -->
+                <div class="flex flex-wrap items-center gap-3 justify-end">
+                    <button id="btn-export-excel" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 text-xs rounded-xl shadow-md transition-all flex items-center gap-2 btn-tap-effect">
+                        <i class="fas fa-file-excel text-sm"></i>
+                        <span>Export to Excel (.xlsx)</span>
+                    </button>
+                    
+                    <button id="btn-clear-students" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 text-xs rounded-xl transition-all flex items-center gap-1.5 btn-tap-effect">
+                        <i class="fas fa-user-slash"></i>
+                        <span>ลบรายชื่อนักเรียนทั้งหมด</span>
+                    </button>
+                    
+                    <button id="btn-clear-dashboard" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 hover:border-red-300 font-bold py-2.5 px-4 text-xs rounded-xl transition-all flex items-center gap-1.5 btn-tap-effect">
+                        <i class="fas fa-eraser"></i>
+                        <span>เคลียร์ Dashboard (ล้างประวัติ)</span>
+                    </button>
+                    
+                    <button id="btn-reset-db" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 text-xs rounded-xl transition-all border border-slate-200 flex items-center gap-1.5 btn-tap-effect">
+                        <i class="fas fa-undo"></i>
+                        <span>รีเซ็ตสถิติทุกอย่าง (มีข้อมูลจำลอง)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Analytics Row: Top 10 Risk Students (left) & Outstanding Classrooms (right) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Top 10 Risk Students Table -->
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fas fa-exclamation-triangle text-amber-500 animate-pulse"></i>
+                            <span>Top 10 นักเรียนกลุ่มเสี่ยงขาด/โดดเรียนสะสม</span>
+                        </h2>
+                        <span class="text-[10px] bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full font-bold">เฝ้าระวังพฤติกรรม</span>
+                    </div>
+                    <div class="overflow-x-auto flex-grow max-h-[350px] overflow-y-auto">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50/80 sticky top-0">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">ห้อง</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">เลขที่</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">ชื่อ-สกุล</th>
+                                    <th scope="col" class="px-4 py-2 text-center text-[10px] font-bold text-slate-500 tracking-wider">ขาดสะสม</th>
+                                    <th scope="col" class="px-4 py-2 text-center text-[10px] font-bold text-slate-500 tracking-wider">โดดสะสม</th>
+                                    <th scope="col" class="px-4 py-2 text-center text-[10px] font-bold text-slate-500 tracking-wider font-bold">คะแนนเสี่ยง</th>
+                                    <th scope="col" class="px-4 py-2 text-center text-[10px] font-bold text-slate-500 tracking-wider">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="risk-students-table-body" class="bg-white divide-y divide-slate-100">
+                                <!-- Loaded dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Outstanding Classrooms Card -->
+                <div class="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fas fa-trophy text-yellow-500 animate-bounce"></i>
+                            <span>อันดับห้องเรียนดีเด่น (อัตราการเข้าเรียนสูงสุด)</span>
+                        </h2>
+                        <span class="text-[10px] bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold">สัปดาห์นี้</span>
+                    </div>
+                    <div class="p-5 flex-grow max-h-[350px] overflow-y-auto space-y-3" id="outstanding-rooms-container">
+                        <!-- Loaded dynamically by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fas fa-table text-blue-600"></i>
+                        <span>ตารางประวัติเช็คชื่อทั้งหมดในวันนี้</span>
+                    </h2>
+                    <span class="text-xs text-slate-400">เรียงตาม ลำดับห้อง > คาบเรียน > เลขที่</span>
+                </div>
+                
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50/80 sticky top-0 backdrop-blur-md">
+                            <tr>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">ห้องเรียน</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">คาบเรียน</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">เลขที่</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">รหัสประจำตัว</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">สถานะ</th>
+                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">เวลาเช็ค</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="bg-white divide-y divide-slate-100">
+                            <!-- Loaded dynamically by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Google Sheets Integration Settings Panel -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fas fa-cloud text-blue-600"></i>
+                        <span>☁️ เชื่อมต่อ Google Sheets (Apps Script Web App)</span>
+                    </h2>
+                    <span class="text-xs text-slate-400">สำหรับทำระบบคลาวด์จัดเก็บข้อมูลถาวร</span>
+                </div>
+                <div class="p-5 space-y-4">
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        เปิดใช้งานตัวเลือกนี้เมื่อคุณต้องการซิงก์ข้อมูลนักเรียนและประวัติการเช็คชื่อทั้งหมดไปยัง Google Sheets ของโรงเรียนโดยอัตโนมัติผ่าน Google Apps Script API
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-1 flex items-center h-10 gap-3">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="settings-sheets-enabled" class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span class="ml-3 text-xs font-bold text-slate-700">เปิดซิงก์ Sheets</span>
+                            </label>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="settings-sheets-url" class="block text-xs font-semibold text-slate-500 mb-1">Web App URL (https://script.google.com/.../exec)</label>
+                            <input type="url" id="settings-sheets-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 text-slate-800 font-semibold" />
+                        </div>
+                        <div class="md:col-span-1">
+                            <button id="btn-save-settings" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 btn-tap-effect">
+                                <i class="fas fa-save"></i>
+                                <span>บันทึกการเชื่อมต่อ</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MOBILE BOTTOM NAVIGATION OVERLAY (สำหรับหัวหน้าห้องใช้มือถือ) -->
+    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center py-2 px-1 z-40 shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.08)]">
+        <button data-tab="check-in" class="nav-tab tab-active flex flex-col items-center gap-1 py-1 px-3 text-slate-500 hover:text-slate-800 transition-all">
+            <i class="fas fa-edit text-lg"></i>
+            <span class="text-[10px] font-bold">เช็คชื่อ</span>
+        </button>
+        <button data-tab="dashboard" class="nav-tab flex flex-col items-center gap-1 py-1 px-3 text-slate-500 hover:text-slate-800 transition-all">
+            <i class="fas fa-chart-pie text-lg"></i>
+            <span class="text-[10px] font-bold">Dashboard</span>
+        </button>
+        <button data-tab="admin" class="nav-tab flex flex-col items-center gap-1 py-1 px-3 text-slate-500 hover:text-slate-800 transition-all">
+            <i class="fas fa-cog text-lg"></i>
+            <span class="text-[10px] font-bold">Admin Panel</span>
+        </button>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full px-4 sm:px-0">
+        <!-- Generated Dynamically by JS -->
+    </div>
+
+    <!-- MODAL: ADD STUDENT -->
+    <div id="modal-add-student" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full mx-4 overflow-hidden transform scale-95 transition-transform duration-300">
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fas fa-user-plus text-indigo-600"></i>
+                    <span>เพิ่มรายชื่อนักเรียนรายคน</span>
+                </h3>
+                <button onclick="window.app.closeAddStudentModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+            </div>
+            <!-- Body -->
+            <form id="form-add-student" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5">ห้องเรียนปลายทาง</label>
+                    <input type="text" id="add-student-room-display" disabled class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-600" />
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="add-student-no" class="block text-xs font-bold text-slate-500 mb-1.5">เลขที่</label>
+                        <input type="number" id="add-student-no" required min="1" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-semibold text-slate-800" />
+                    </div>
+                    <div>
+                        <label for="add-student-gender" class="block text-xs font-bold text-slate-500 mb-1.5">เพศ</label>
+                        <select id="add-student-gender" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-semibold text-slate-800">
+                            <option value="male">ชาย</option>
+                            <option value="female">หญิง</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label for="add-student-id" class="block text-xs font-bold text-slate-500 mb-1.5">รหัสนักเรียน</label>
+                    <input type="text" id="add-student-id" required placeholder="เช่น ST10241" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-semibold text-slate-800" />
+                </div>
+                <div>
+                    <label for="add-student-name" class="block text-xs font-bold text-slate-500 mb-1.5">ชื่อ-นามสกุล</label>
+                    <input type="text" id="add-student-name" required placeholder="เช่น นายวิทยา เรียนดี" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 font-semibold text-slate-800" />
+                </div>
+                <!-- Actions -->
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="window.app.closeAddStudentModal()" class="px-4 py-2.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all">ยกเลิก</button>
+                    <button type="submit" class="px-5 py-2.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all">บันทึกรายชื่อ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="importedStudentsData.js"></script>
+    <script src="mockData.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
