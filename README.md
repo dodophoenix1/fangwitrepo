@@ -44,6 +44,7 @@
 - ดับเบิ้ลคลิกเปิดไฟล์ `index.html` ด้วยเว็บเบราว์เซอร์ได้ทันที
 - หรือใช้ Extension เช่น **Live Server** ใน VS Code เพื่อเปิดใช้งาน
 - เอาไปพัฒนากันต่อได้เลยครับ ผมแจกฟรี
-<img width="464" height="771" alt="bmcf" src="https://github.com/user-attachments/assets/b2d54aa3-1773-4ebf-8336-fb8971ab3daa" />
 - ขอบคุณที่สนับสนุนกันครับ
+<img width="464" height="771" alt="bmcf" src="https://github.com/user-attachments/assets/b2d54aa3-1773-4ebf-8336-fb8971ab3daa" />
+
 
